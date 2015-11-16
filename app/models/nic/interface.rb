@@ -2,8 +2,8 @@ module Nic
   class Interface < Base
     attr_accessible :ip
 
-    validates :ip, :uniqueness => true, :format => {:with => Net::Validations::IP_REGEXP}, :allow_blank => true
-
+    validates :ip, :format => {:with => Net::Validations::IP_REGEXP}, :allow_blank => true
+    validate :check_ip_uniq
     validate :normalize_ip
 
     validates :attached_to, :presence => true, :if => Proc.new { |o| o.virtual && o.instance_of?(Nic::Managed) && !o.bridge? }
@@ -76,6 +76,12 @@ module Nic
 
     def uniq_fields_with_hosts
       super + (self.virtual? ? [] : [:ip])
+    end
+
+    def check_ip_uniq
+      if Nic::Interface.where("ip = BINARY ? AND id NOT IN (?)",self.ip,host.interfaces.find_all {|s| s._destroy == true or s.id == self.id }.map { |s| s.id}).size > 0
+        errors.add(:ip," is already taken")
+      end
     end
 
     def normalize_ip
